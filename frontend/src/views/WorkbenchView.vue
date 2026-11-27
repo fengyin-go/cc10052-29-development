@@ -60,6 +60,15 @@
             >
               {{ action }}
             </button>
+            <button
+              v-if="meta.key === 'anomaly_metric' && row.status === '已确认'"
+              class="link"
+              type="button"
+              :data-testid="`launch-${row.id}`"
+              @click="openLaunch(row)"
+            >
+              发起异常调查
+            </button>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -86,6 +95,39 @@
       </form>
     </div>
 
+    <div v-if="showLaunch" class="modal-backdrop" data-testid="launch-modal">
+      <form class="modal" @submit.prevent="submitLaunch">
+        <h3>从已确认异常发起调查：{{ launchRow?.['异常编号'] }}</h3>
+        <p class="page-desc">提交后由案件工作台按同窗口归并建案，重复来源重报不叠加影响次数。</p>
+        <label class="create-field">
+          <span>来源标识（必填）</span>
+          <input v-model="launchForm.source_code" data-testid="launch-source" required />
+        </label>
+        <label class="create-field">
+          <span>事件编码（必填）</span>
+          <input v-model="launchForm.event_code" data-testid="launch-event" required />
+        </label>
+        <label class="create-field">
+          <span>窗口标识（留空取异常基线区间）</span>
+          <input v-model="launchForm.window_key" data-testid="launch-window" />
+        </label>
+        <label class="create-field">
+          <span>来源名称</span>
+          <input v-model="launchForm.source_name" data-testid="launch-source-name" />
+        </label>
+        <label class="create-field">
+          <span>证据材料</span>
+          <input v-model="launchForm.evidence" data-testid="launch-evidence" />
+        </label>
+        <div class="page-actions">
+          <button class="btn" type="button" @click="showLaunch = false">取消</button>
+          <button class="btn primary" data-testid="submit-launch" type="submit" :disabled="creating">
+            {{ creating ? '提交中…' : '发起调查' }}
+          </button>
+        </div>
+      </form>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条{{ meta.name }}记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -103,6 +145,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/backend-service'
+import { launchFromAnomaly } from '@/api/case-workbench'
 import type { EntryRow } from '@/data/types'
 
 const props = defineProps<{ moduleKey: string }>()
@@ -115,6 +158,9 @@ const filterFields = meta.fields.slice(0, 3)
 const showCreate = ref(false)
 const creating = ref(false)
 const createValues = ref<Record<string, string>>({})
+const showLaunch = ref(false)
+const launchRow = ref<EntryRow | null>(null)
+const launchForm = ref({ source_code: '', event_code: '', window_key: '', source_name: '', evidence: '' })
 const stats = computed(() => [
   { label: meta.metrics[0], value: total.value },
   { label: meta.metrics[1], value: rows.value.filter((row) => row.status === meta.statuses[1]).length },
@@ -173,6 +219,30 @@ async function runAction(action: string, row: EntryRow) {
     await reload()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '操作失败'
+  }
+}
+
+function openLaunch(row: EntryRow) {
+  launchRow.value = row
+  launchForm.value = { source_code: '', event_code: '', window_key: '', source_name: '', evidence: '' }
+  errorMessage.value = ''
+  showLaunch.value = true
+}
+
+async function submitLaunch() {
+  if (!launchRow.value) return
+  creating.value = true
+  errorMessage.value = ''
+  try {
+    const result = await launchFromAnomaly(Number(launchRow.value.id), { ...launchForm.value })
+    if (!result.ok) throw new Error(result.message)
+    showLaunch.value = false
+    window.alert(result.message)
+    await reload()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '发起调查失败'
+  } finally {
+    creating.value = false
   }
 }
 

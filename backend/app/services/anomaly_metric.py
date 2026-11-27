@@ -130,3 +130,45 @@ class AnomalyMetricService(BaseModuleService):
             for r in store.rows(self.MODULE)
             if r.get("指标编码") == metric_code and r.get("status") == "已确认"
         ]
+
+    # ---- 业务扩展：从已确认异常日志发起异常调查（进入案件工作台） ----
+
+    def launch_investigation(
+        self,
+        entry_id: int,
+        source_code: str,
+        event_code: str,
+        window_key: str = "",
+        *,
+        source_name: str = "",
+        evidence: str = "",
+    ) -> dict[str, Any]:
+        """异常调查入口：仅已确认的异常日志可发起，转交异常案件工作台归并建案。
+
+        窗口标识缺省时取异常事件自身的基线区间，保证同一窗口的重复证据
+        在服务端归并到同一案件。
+        """
+        entry = store.find(self.MODULE, entry_id)
+        if entry is None:
+            return {"ok": False, "message": f"异常事件 {entry_id} 不存在"}
+        if entry.get("status") != "已确认":
+            return {"ok": False, "message": "仅已确认的异常日志可发起异常调查"}
+        if not source_code.strip() or not event_code.strip():
+            return {"ok": False, "message": "来源标识与事件编码为必填"}
+        metric_code = str(entry.get("指标编码", ""))
+        resolved_window = window_key.strip() or str(entry.get("基线区间", "")) or "默认窗口"
+
+        from app.services.anomaly_case import AnomalyCaseService
+
+        result = AnomalyCaseService().open_investigation(
+            metric_code=metric_code,
+            window_key=resolved_window,
+            source_code=source_code.strip(),
+            event_code=event_code.strip(),
+            anomaly_id=entry_id,
+            source_name=source_name.strip(),
+            evidence=evidence.strip(),
+        )
+        if result.get("ok"):
+            entry["调查案件编号"] = result["case"]["案件编号"]
+        return result

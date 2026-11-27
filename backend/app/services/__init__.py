@@ -15,6 +15,10 @@ from app.services.report_dist import ReportDistService
 from app.services.window_scheduler import WindowSchedulerService
 from app.services.data_freshness import DataFreshnessService
 from app.services.anomaly_metric import AnomalyMetricService
+from app.services.anomaly_case import AnomalyCaseService
+from app.services.anomaly_source import AnomalySourceService
+from app.services.anomaly_investigation import AnomalyInvestigationService
+from app.services.risk_action import RiskActionService
 from app.services.exp_archive import ExpArchiveService
 from app.services.sample_ratio import SampleRatioService
 from app.services.aa_check import AaCheckService
@@ -37,6 +41,10 @@ SERVICES: dict[str, BaseModuleService] = {
     "window_scheduler": WindowSchedulerService(),
     "data_freshness": DataFreshnessService(),
     "anomaly_metric": AnomalyMetricService(),
+    "anomaly_case": AnomalyCaseService(),
+    "anomaly_source": AnomalySourceService(),
+    "anomaly_investigation": AnomalyInvestigationService(),
+    "risk_action": RiskActionService(),
     "exp_archive": ExpArchiveService(),
     "sample_ratio": SampleRatioService(),
     "aa_check": AaCheckService(),
